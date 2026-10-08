@@ -9,7 +9,7 @@
 // Prints the help text using a -h flag
 void print_help(void);
 
-// Runs the minimat> prompt loop until the user types quit
+// Runs the minimat> prompt loop until the user enters quit
 void run_ui(void);
 
 #endif

@@ -23,8 +23,7 @@ void print_vect(char *name, vect v)
 
 void print_help(void)
 {
-    printf("minimat - a simple 3D vector calculator\n");
-    printf("\n");
+    printf("minimat - a simple 3D vector calculator\n\n");
     printf("Usage: ./minimat        start the calculator\n");
     printf("       ./minimat -h     show this help\n");
     printf("\n");
@@ -40,8 +39,7 @@ void print_help(void)
     printf("  c = a + b        do an operation and save the result in c\n");
     printf("  list             show all stored vectors\n");
     printf("  clear            erase all stored vectors\n");
-    printf("  quit             exit the program\n");
-    printf("\n");
+    printf("  quit             exit the program\n\n");
     printf("NOTE: seperate each character with spaces\n");
 }
 
