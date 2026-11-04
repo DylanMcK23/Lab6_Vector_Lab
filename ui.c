@@ -1,6 +1,6 @@
 /*
 * Author: Dylan McKinney
-* File: ui.h
+* File: ui.c
 * Description: The user interface (layer 3/3)
 */
 
@@ -23,7 +23,8 @@ void print_vect(char *name, vect v)
 
 void print_help(void)
 {
-    printf("minimat - a simple 3D vector calculator\n\n");
+    printf("minimat - a simple 3D vector calculator\n");
+    printf("\n");
     printf("Usage: ./minimat        start the calculator\n");
     printf("       ./minimat -h     show this help\n");
     printf("\n");
@@ -39,7 +40,11 @@ void print_help(void)
     printf("  c = a + b        do an operation and save the result in c\n");
     printf("  list             show all stored vectors\n");
     printf("  clear            erase all stored vectors\n");
-    printf("  quit             exit the program\n\n");
+    printf("  load file.csv    load vectors from a csv file (same names are replaced)\n");
+    printf("  save file.csv    save all stored vectors to a csv file\n");
+    printf("  fill 100         make 100 test vectors named v0, v1, v2, ...\n");
+    printf("  quit             exit the program\n");
+    printf("\n");
     printf("NOTE: seperate each character with spaces\n");
 }
 
@@ -83,7 +88,7 @@ int do_operation(char *left, char *op, char *right, vect *result)
     int have_a = findvect(left, &a);
     int have_b = findvect(right, &b);
 
-    // scalar multiplication is a special case (one vector and one number)
+    // scalar multiplication is a special case
     if (op[0] == '*') 
     {
         if (have_a == 1 && have_b == 0 && parse_number(right, &num) == 1) 
@@ -176,7 +181,6 @@ void handle_op_assign(char *name, char *left, char *op, char *right)
 {
     vect result;
 
-    // a dot product is a number, not a vector, so we can't save it as a vector
     if (op[0] == '.') 
     {
         printf("Error: a dot product is a number, it can't be saved as a vector\n");
@@ -202,8 +206,6 @@ void handle_op_assign(char *name, char *left, char *op, char *right)
     print_vect(name, result);   // show it either way
 }
 
-// Handles:  name = 1 2 3
-// words[0] is the name, words[1] is "=", the numbers start at words[2]
 void handle_assignment(char *words[], int count)
 {
     vect new_vect;
@@ -265,7 +267,7 @@ void handle_list(void)
     int i;
     int count = 0;
 
-    for (i = 0; i < MAX_VECTORS; i++) 
+    for (i = 0; i < getcount(); i++) 
     {
         if (getvect(i, &v) == 1) 
         {
@@ -279,7 +281,164 @@ void handle_list(void)
     }
 }
 
-// The main loop: read a line, split it into words, figure out what it is
+// The load command. Reads a csv file
+// Vectors with the same name as one stored get replaced.
+void handle_load(char *filename)
+{
+    FILE *fp;
+    char line[LINE_LEN];
+    char *fields[5];     
+    char *word;
+    vect new_vect;
+    int fcount;
+    int line_num = 0;
+    int loaded = 0;
+    int bad = 0;
+    int ok;
+    double values[3];
+    int i;
+
+    fp = fopen(filename, "r");
+    if (fp == NULL) 
+    {
+        printf("Error: could not open file %s\n", filename);
+        return;
+    }
+
+    while (fgets(line, LINE_LEN, fp) != NULL) 
+    {
+        line_num++;
+
+        // get rid of \n or \r\n at the end of the line
+        line[strcspn(line, "\r\n")] = '\0';
+
+        // split the line up at the commas
+        fcount = 0;
+        word = strtok(line, ",");
+        while (word != NULL && fcount < 5) 
+        {
+            fields[fcount] = word;
+            fcount++;
+            word = strtok(NULL, ",");
+        }
+
+        // empty line, just skip it
+        if (fcount == 0) 
+        {
+            continue;
+        }
+
+        // check the line is formatted right
+        ok = 1;
+        if (fcount != 4) 
+        {
+            ok = 0;
+        }
+        else if (strlen(fields[0]) >= NAME_LEN || isalpha(fields[0][0]) == 0) 
+        {
+            ok = 0;
+        }
+        else 
+        {
+            for (i = 0; i < 3; i++) 
+            {
+                if (parse_number(fields[i + 1], &values[i]) == 0) 
+                {
+                    ok = 0;
+                }
+            }
+        }
+
+        if (ok == 0) 
+        {
+            printf("Error: bad format on line %d of %s, skipping it\n", line_num, filename);
+            bad++;
+            continue;
+        }
+
+        strcpy(new_vect.name, fields[0]);
+        new_vect.x = values[0];
+        new_vect.y = values[1];
+        new_vect.z = values[2];
+
+        if (addvect(new_vect) == -1) 
+        {
+            printf("Error: memory full, stopped loading at line %d\n", line_num);
+            break;
+        }
+        loaded++;
+    }
+
+    fclose(fp);
+    printf("Loaded %d vectors from %s", loaded, filename);
+    if (bad > 0) 
+    {
+        printf(" (%d bad lines skipped)", bad);
+    }
+    printf("\n");
+}
+
+// The save command. Writes every stored vector to a csv file.
+// If the file already exists it gets overwritten.
+void handle_save(char *filename)
+{
+    FILE *fp;
+    vect v;
+    int i;
+    int saved = 0;
+
+    fp = fopen(filename, "w");
+    if (fp == NULL) 
+    {
+        printf("Error: could not open file %s for writing\n", filename);
+        return;
+    }
+
+    for (i = 0; i < getcount(); i++) 
+    {
+        if (getvect(i, &v) == 1) 
+        {
+            fprintf(fp, "%s,%.10g,%.10g,%.10g\n", v.name, v.x, v.y, v.z);
+            saved++;
+        }
+    }
+
+    fclose(fp);
+    printf("Saved %d vectors to %s\n", saved, filename);
+}
+
+// The fill command (optional part of the lab).
+// Makes a bunch of vectors named v0, v1, v2, ... with random values
+void handle_fill(char *amount)
+{
+    double num;
+    int n;
+    int i;
+    vect v;
+
+    if (parse_number(amount, &num) == 0 || num < 1) 
+    {
+        printf("Error: fill needs a number that is 1 or more\n");
+        return;
+    }
+    n = (int)num;
+
+    for (i = 0; i < n; i++) 
+    {
+        snprintf(v.name, NAME_LEN, "v%d", i);
+        v.x = rand() % 100;
+        v.y = rand() % 100;
+        v.z = rand() % 100;
+        if (addvect(v) == -1) 
+        {
+            printf("Error: memory full, stopped after %d vectors\n", i);
+            return;
+        }
+    }
+    printf("Filled %d vectors\n", n);
+}
+
+// The minmat loop
 void run_ui(void)
 {
     char line[LINE_LEN];
@@ -298,7 +457,6 @@ void run_ui(void)
             break;
         }
 
-        // turn commas, newlines, and \r into spaces so strtok can split it
         for (i = 0; line[i] != '\0'; i++) 
         {
             if (line[i] == ',' || line[i] == '\n' || line[i] == '\r') 
@@ -307,7 +465,6 @@ void run_ui(void)
             }
         }
 
-        // split the line into words
         count = 0;
         word = strtok(line, " \t");
         while (word != NULL && count < MAX_TOKENS) 
@@ -323,13 +480,11 @@ void run_ui(void)
             continue;
         }
 
-        // blank line, just ask again
         if (count == 0) 
         {
             continue;
         }
 
-        // now decide what the user typed
         if (count == 1) 
         {
             if (strcmp(words[0], "quit") == 0) 
@@ -349,6 +504,18 @@ void run_ui(void)
             {
                 handle_display(words[0]);
             }
+        }
+        else if (count == 2 && strcmp(words[0], "load") == 0) 
+        {
+            handle_load(words[1]);
+        }
+        else if (count == 2 && strcmp(words[0], "save") == 0) 
+        {
+            handle_save(words[1]);
+        }
+        else if (count == 2 && strcmp(words[0], "fill") == 0) 
+        {
+            handle_fill(words[1]);
         }
         else if (count == 3 && is_operator(words[1]) == 1) 
         {

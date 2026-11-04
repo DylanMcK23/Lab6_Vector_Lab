@@ -2,44 +2,60 @@
 * Author: Dylan McKinney
 * File: vect_storage.c
 * Description: Functions for the storage array (layer 2/3)
+*              The vectors are kept in a dynamic array that grows
+*              with realloc when it gets full.
 */
 
+#include <stdlib.h>
 #include <string.h>
 #include "vect_storage.h"
 
-static vect storage[MAX_VECTORS];
-static int used[MAX_VECTORS];    // 1 if that spot has a vector, 0 if empty
+static vect *storage = NULL;   // the dynamic array (NULL when empty)
+static int count = 0;          // how many vectors are in the array
+static int capacity = 0;       // how many vectors the array has room for
 
 int addvect(vect new_vect)
 {
     int i;
+    int new_capacity;
+    vect *temp;
 
     // first look to see if the name is already in there
-    for (i = 0; i < MAX_VECTORS; i++) {
-        if (used[i] == 1 && strcmp(storage[i].name, new_vect.name) == 0) {
+    for (i = 0; i < count; i++) {
+        if (strcmp(storage[i].name, new_vect.name) == 0) {
             storage[i] = new_vect;
             return 0;
         }
     }
 
-    // otherwise find the first empty spot
-    for (i = 0; i < MAX_VECTORS; i++) {
-        if (used[i] == 0) {
-            storage[i] = new_vect;
-            used[i] = 1;
-            return 0;
+    // if the array is full make it bigger
+    if (count == capacity) {
+        if (capacity == 0) {
+            new_capacity = START_SIZE;
         }
+        else {
+            new_capacity = capacity * 2;
+        }
+
+        // use a temp pointer so we don't lose the old array if realloc fails
+        temp = realloc(storage, new_capacity * sizeof(vect));
+        if (temp == NULL) {
+            return -1;
+        }
+        storage = temp;
+        capacity = new_capacity;
     }
 
-    // no empty spots
-    return -1;
+    storage[count] = new_vect;
+    count++;
+    return 0;
 }
 
 int findvect(char *name, vect *found)
 {
     int i;
-    for (i = 0; i < MAX_VECTORS; i++) {
-        if (used[i] == 1 && strcmp(storage[i].name, name) == 0) {
+    for (i = 0; i < count; i++) {
+        if (strcmp(storage[i].name, name) == 0) {
             *found = storage[i];
             return 1;
         }
@@ -49,20 +65,22 @@ int findvect(char *name, vect *found)
 
 int getvect(int index, vect *found)
 {
-    if (index < 0 || index >= MAX_VECTORS) {
+    if (index < 0 || index >= count) {
         return 0;
     }
-    if (used[index] == 1) {
-        *found = storage[index];
-        return 1;
-    }
-    return 0;
+    *found = storage[index];
+    return 1;
+}
+
+int getcount(void)
+{
+    return count;
 }
 
 void clearvects(void)
 {
-    int i;
-    for (i = 0; i < MAX_VECTORS; i++) {
-        used[i] = 0;
-    }
+    free(storage);
+    storage = NULL;
+    count = 0;
+    capacity = 0;
 }
