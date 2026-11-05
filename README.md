@@ -1,6 +1,8 @@
 # Lab6_Vector_Lab
 # Minimat - 3D Vector Calculator
 
+making a branch for lab testing
+
 **Author:** Dylan McKinney
 **Course:** CPE-2600 Systems Programming
 
